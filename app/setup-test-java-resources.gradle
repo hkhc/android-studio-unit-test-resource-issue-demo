@@ -1,0 +1,53 @@
+gradle.projectsEvaluated {
+    // Base path which is recognized by android studio.
+    def testClassesPath = "${buildDir}/intermediates/classes/test/"
+    // Copy must be done for each variant.
+    def variants = android.applicationVariants.collect()
+
+    variants.each { variant ->
+        def variationName = variant.name.capitalize()
+
+        // Get the flavor and also merge flavor groups.
+        def productFlavorNames = variant.productFlavors.collect { it.name.capitalize() }
+        if (productFlavorNames.isEmpty()) {
+            productFlavorNames = [""]
+        }
+        productFlavorNames = productFlavorNames.join('')
+
+        // Base path addition for this specific variant.
+        def variationPath = variant.buildType.name;
+        if (productFlavorNames != null && !productFlavorNames.isEmpty()) {
+            variationPath = uncapitalize(productFlavorNames) + "/${variationPath}"
+        }
+
+        configurations.compile.each {
+            String p = it.absolutePath
+            if (p.endsWith('.jar')) {
+                copy {
+                    from zipTree(p)
+                    into file("${testClassesPath}/${variationPath}")
+                    exclude '**/*.class'
+                }
+            }
+            else if (it.absolutePath.endsWith('.aar')) {
+                FileTree t = zipTree(it.absolutePath)
+                t.each {
+                    String p2 = it.absolutePath
+                    if (p2.endsWith('jar')) {
+                        copy {
+                            from zipTree(p2)
+                            into file("${testClassesPath}/${variationPath}")
+                            exclude '**/*.class'
+                        }
+                    }
+                }
+            }
+        }
+
+        copy {
+            from project.android.sourceSets["test"].resources.srcDirs
+            into "${project.buildDir}/intermediates/classes/test/${variationPath}"
+        }
+
+    }
+}
